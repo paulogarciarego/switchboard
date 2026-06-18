@@ -21,27 +21,22 @@ Limitação honesta: se o colega estiver com o Claude parado sem digitar nada, a
 npm install -g claude-switchboard
 ```
 
-## Setup (cada pessoa faz uma vez)
-
-1. Entrar na sala (mesmo nome combinado com o time):
+## Setup (cada pessoa faz uma vez, leva 1 minuto)
 
 ```bash
-switchboard join projeto-x --name paulo --relay https://SEU-RELAY
+# 1. instalar
+npm install -g claude-switchboard
+
+# 2. dentro da pasta do projeto, ligar no Claude Code (configura sozinho)
+switchboard install
+
+# 3. entrar na sala (mesmo nome combinado com o time)
+switchboard join projeto-x --name paulo
 ```
 
-2. Ligar o MCP no Claude Code. No `.mcp.json` do projeto (ou global), adicione:
+Reinicie o Claude Code nessa pasta e pronto. O `install` escreve o MCP no `.mcp.json` e o hook de auto-sync no `.claude/settings.json` pra você.
 
-```json
-{
-  "mcpServers": {
-    "switchboard": { "command": "switchboard-mcp" }
-  }
-}
-```
-
-> Enquanto não publica no npm, aponte direto: `"command": "node", "args": ["/caminho/switchboard/mcp/server.mjs"]`.
-
-3. Copie os comandos `claude/commands/sb-pull.md` e `claude/commands/sb-push.md` pra pasta `.claude/commands/` do seu projeto. Aí você usa **/sb-pull** e **/sb-push** dentro do Claude.
+Depois é só trabalhar normal e falar com o Claude em linguagem natural ("manda isso pro fulano"). O resto é automático.
 
 ## O relay (onde a sala vive)
 

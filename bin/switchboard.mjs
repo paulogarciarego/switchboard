@@ -63,6 +63,37 @@ async function main() {
       console.log("nota enviada");
       break;
     }
+    case "install": {
+      // Configura o Claude Code sozinho: liga o MCP (.mcp.json) e o hook de
+      // auto-sync (.claude/settings.json) na pasta atual (o projeto).
+      const { readFileSync, writeFileSync, mkdirSync, existsSync } = await import("node:fs");
+      const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return {}; } };
+
+      // 1) MCP em .mcp.json
+      const mcpPath = ".mcp.json";
+      const mcp = readJson(mcpPath);
+      mcp.mcpServers = mcp.mcpServers || {};
+      mcp.mcpServers.switchboard = { command: "switchboard-mcp" };
+      writeFileSync(mcpPath, JSON.stringify(mcp, null, 2));
+
+      // 2) hook de auto-sync em .claude/settings.json
+      mkdirSync(".claude", { recursive: true });
+      const setPath = ".claude/settings.json";
+      const set = readJson(setPath);
+      set.hooks = set.hooks || {};
+      set.hooks.UserPromptSubmit = set.hooks.UserPromptSubmit || [];
+      const already = JSON.stringify(set.hooks.UserPromptSubmit).includes("switchboard-autosync");
+      if (!already) set.hooks.UserPromptSubmit.push({ hooks: [{ type: "command", command: "switchboard-autosync" }] });
+      writeFileSync(setPath, JSON.stringify(set, null, 2));
+
+      console.log("switchboard ligado neste projeto:");
+      console.log("  .mcp.json            -> ferramentas (sb_send, sb_push, sb_pull...)");
+      console.log("  .claude/settings.json-> hook de auto-sync (recebe sozinho)");
+      console.log(already ? "  (hook já estava ligado)" : "");
+      console.log("\nagora rode:  switchboard join <sala> --name SEU_NOME");
+      console.log("e reinicie o Claude Code nessa pasta.");
+      break;
+    }
     case "relay": {
       await import("../src/relay-server.mjs");
       break;
@@ -71,6 +102,7 @@ async function main() {
       console.log(`switchboard - colaboração de contexto entre instâncias de Claude
 
 uso:
+  switchboard install                                   liga o switchboard no Claude Code (deste projeto)
   switchboard join <sala> [--name NOME] [--relay URL]   entra numa sala
   switchboard pull                                      mostra o contexto atual da sala
   switchboard push --title "X" [--file f.md]            envia contexto (ou via stdin)
