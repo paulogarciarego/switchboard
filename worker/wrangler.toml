@@ -1,0 +1,9 @@
+name = "switchboard"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Crie o namespace:  wrangler kv namespace create ROOMS
+# e cole o id aqui:
+[[kv_namespaces]]
+binding = "ROOMS"
+id = "COLE_O_ID_AQUI"

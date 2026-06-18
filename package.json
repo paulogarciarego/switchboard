@@ -1,0 +1,19 @@
+{
+  "name": "claude-switchboard",
+  "version": "0.1.0",
+  "description": "Camada de colaboração para times trabalhando no mesmo projeto com Claude Code. Compartilha contexto entre instâncias por comando, sem ctrl c ctrl v.",
+  "type": "module",
+  "bin": {
+    "switchboard": "bin/switchboard.mjs",
+    "sb": "bin/switchboard.mjs",
+    "switchboard-mcp": "mcp/server.mjs"
+  },
+  "files": ["bin", "src", "mcp", "claude", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "relay": "node src/relay-server.mjs",
+    "mcp": "node mcp/server.mjs"
+  },
+  "keywords": ["claude", "claude-code", "mcp", "collaboration", "context", "switchboard"],
+  "license": "MIT"
+}
