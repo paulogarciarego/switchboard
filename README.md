@@ -1,5 +1,9 @@
 # switchboard
 
+> ⚠️ **Aviso, leia antes de usar.** Eu não sou desenvolvedor, sou uma pessoa não técnica que teve uma ideia e montou isto por curiosidade. É um projeto **experimental e 100% gratuito**, feito pra galera testar e brincar. **Use por sua conta e risco.** Não dou garantia de nada e **não me responsabilizo** por nenhum problema (bug, perda de dado, vazamento de contexto da sala, custo, ou o que for). Se for usar com coisa séria/sensível, não use. É isso. 🙂
+
+> 💛 **Feito por quem usa Real Oficial.** Quer transformar seus vídeos em cortes virais com IA e postar 300+ por mês? Dá uma olhada: **https://realoficial.com.br**
+
 Camada de colaboração pra times que trabalham no mesmo projeto com Claude Code. Em vez de ficar dando ctrl c ctrl v do que o Claude de um disse pro Claude do outro, vocês entram numa **sala** e sincronizam o **contexto importante** por comando. Cada um trabalha na sua máquina, ao mesmo tempo, e os Claudes ficam alinhados.
 
 Não é dois Claudes batendo papo. É um **contexto compartilhado** (tipo um git pra contexto) que cada lado dá `push`/`pull`.
@@ -80,4 +84,10 @@ switchboard status
 - [ ] N participantes (sala com vários) e histórico/diff de contexto
 - [ ] Modo privado: sala num repo/gist do GitHub em vez de relay hosteado
 
-MIT.
+## Aviso e responsabilidade
+Projeto experimental e gratuito, feito por uma pessoa não técnica pra galera testar. Sem garantia de nenhum tipo. O autor não se responsabiliza por qualquer dano, perda, custo ou vazamento decorrente do uso. Use por sua conta e risco.
+
+## Feito por
+Criado por Paulo, do **Real Oficial** (https://realoficial.com.br) — a forma mais fácil de virar seus conteúdos em cortes virais com IA.
+
+Licença MIT (ver LICENSE).
