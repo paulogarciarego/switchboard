@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 // CLI do switchboard: join / push / pull / note / status / relay
 import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { readConfig, writeConfig } from "../src/config.mjs";
 import * as api from "../src/api.mjs";
+
+const rand = (n) => randomBytes(n).toString("hex");
+const slug = (s) => (s || "sala").toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sala";
+const makeInvite = ({ r, k, u }) => Buffer.from(JSON.stringify({ r, k, u })).toString("base64url");
+function parseInvite(s) {
+  try { const o = JSON.parse(Buffer.from(s, "base64url").toString("utf8")); if (o && o.r && o.k) return o; } catch {}
+  return null;
+}
 
 const [cmd, ...rest] = process.argv.slice(2);
 const flag = (n, d) => { const i = rest.indexOf("--" + n); return i >= 0 ? rest[i + 1] : d; };
@@ -12,16 +21,30 @@ function fmtTime(t) { return new Date(t).toLocaleTimeString("pt-BR", { hour: "2-
 
 async function main() {
   switch (cmd) {
+    case "create": {
+      // cria uma sala nova, com nome único e chave secreta
+      const name = flag("name", readConfig().name || process.env.USER || "anon");
+      const relay = flag("relay", readConfig().relay);
+      const room = slug(positional[0]) + "-" + rand(3); // nome amigável + sufixo aleatório
+      const key = rand(12); // chave secreta da sala
+      writeConfig({ room, key, relay, name });
+      const invite = makeInvite({ r: room, k: key, u: relay });
+      console.log(`sala criada: ${room}`);
+      console.log(`você entrou como: ${name}\n`);
+      console.log("MANDE este convite pro seu time (quem tiver ele entra, quem não tiver não):\n");
+      console.log(`  switchboard join ${invite}\n`);
+      console.log("(o convite já carrega a sala + a chave + o relay)");
+      break;
+    }
     case "join": {
-      const room = positional[0];
-      if (!room) return fail("uso: switchboard join <sala> [--name SEU_NOME] [--relay URL]");
-      const cfg = writeConfig({
-        room,
-        name: flag("name", readConfig().name || process.env.USER || "anon"),
-        relay: flag("relay", readConfig().relay),
-      });
+      const arg = positional[0];
+      if (!arg) return fail("uso: switchboard join <convite>   (ou: join <sala> --key CHAVE)");
+      const inv = parseInvite(arg);
+      const cfg = inv
+        ? writeConfig({ room: inv.r, key: inv.k, relay: inv.u || readConfig().relay, name: flag("name", readConfig().name || process.env.USER || "anon") })
+        : writeConfig({ room: arg, key: flag("key", null), relay: flag("relay", readConfig().relay), name: flag("name", readConfig().name || process.env.USER || "anon") });
       console.log(`entrou na sala "${cfg.room}" como ${cfg.name}`);
-      console.log(`relay: ${cfg.relay}`);
+      console.log(cfg.key ? "sala protegida por chave ✓" : "sala aberta (sem chave) ⚠");
       break;
     }
     case "status": {
@@ -103,7 +126,8 @@ async function main() {
 
 uso:
   switchboard install                                   liga o switchboard no Claude Code (deste projeto)
-  switchboard join <sala> [--name NOME] [--relay URL]   entra numa sala
+  switchboard create [nome] [--name SEU_NOME]           cria uma sala com chave e gera um convite
+  switchboard join <convite>                            entra numa sala pelo convite (ou: join <sala> --key CHAVE)
   switchboard pull                                      mostra o contexto atual da sala
   switchboard push --title "X" [--file f.md]            envia contexto (ou via stdin)
   switchboard note "..."                                manda uma nota rápida na timeline

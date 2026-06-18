@@ -4,6 +4,9 @@ import { createServer } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+
+const sha = (s) => createHash("sha256").update(String(s)).digest("hex");
 
 const PORT = Number(process.env.PORT || process.argv[2] || 8787);
 const ROOMS_DIR = join(homedir(), ".switchboard", "rooms");
@@ -37,8 +40,21 @@ const server = createServer(async (req, res) => {
   const sub = m[2];
   const data = load(room);
 
+  // Controle de acesso por chave de sala.
+  // Sala protegida = tem keyHash. Quem acessa precisa mandar a chave certa.
+  const provided = req.headers["x-sb-key"];
+  const providedHash = provided ? sha(provided) : null;
+  const writing = req.method !== "GET";
+  if (data.keyHash) {
+    if (providedHash !== data.keyHash) return send(res, 403, { error: "chave da sala incorreta ou ausente" });
+  } else if (writing && provided) {
+    // primeira escrita com chave: a sala passa a ser protegida por essa chave
+    data.keyHash = providedHash;
+  }
+  const sanitize = (d) => ({ context: d.context, events: d.events, rev: d.rev });
+
   // GET /r/:room  -> estado completo da sala
-  if (req.method === "GET" && !sub) return send(res, 200, data);
+  if (req.method === "GET" && !sub) return send(res, 200, sanitize(data));
 
   // PUT /r/:room/context -> atualiza o documento de contexto
   if (req.method === "PUT" && sub === "/context") {

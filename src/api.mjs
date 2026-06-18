@@ -9,10 +9,11 @@ function base() {
 
 async function req(path, opts = {}) {
   const { relay, room } = base();
+  const { key } = readConfig();
   const url = `${relay}/r/${room}${path}`;
   const res = await fetch(url, {
     ...opts,
-    headers: { "content-type": "application/json", ...(opts.headers || {}) },
+    headers: { "content-type": "application/json", ...(key ? { "x-sb-key": key } : {}), ...(opts.headers || {}) },
   });
   if (!res.ok) throw new Error(`relay ${res.status}: ${await res.text().catch(() => "")}`);
   return res.status === 204 ? null : res.json();

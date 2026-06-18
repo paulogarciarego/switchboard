@@ -17,7 +17,7 @@ async function main() {
   let data;
   try {
     const url = `${cfg.relay.replace(/\/$/, "")}/r/${encodeURIComponent(cfg.room)}`;
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url, { signal: ctrl.signal, headers: cfg.key ? { "x-sb-key": cfg.key } : {} });
     if (!res.ok) return;
     data = await res.json();
   } catch { return; } finally { clearTimeout(timer); }

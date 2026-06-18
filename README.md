@@ -25,22 +25,34 @@ Limitação honesta: se o colega estiver com o Claude parado sem digitar nada, a
 npm install -g claude-switchboard
 ```
 
-## Setup (cada pessoa faz uma vez, leva 1 minuto)
+## Setup (leva 1 minuto)
+
+Todo mundo instala e liga no Claude Code:
 
 ```bash
-# 1. instalar
 npm install -g claude-switchboard
-
-# 2. dentro da pasta do projeto, ligar no Claude Code (configura sozinho)
-switchboard install
-
-# 3. entrar na sala (mesmo nome combinado com o time)
-switchboard join projeto-x --name paulo
+switchboard install                 # dentro da pasta do projeto, configura o Claude Code sozinho
 ```
 
-Reinicie o Claude Code nessa pasta e pronto. O `install` escreve o MCP no `.mcp.json` e o hook de auto-sync no `.claude/settings.json` pra você.
+Aí UMA pessoa cria a sala e manda o convite pro time:
 
-Depois é só trabalhar normal e falar com o Claude em linguagem natural ("manda isso pro fulano"). O resto é automático.
+```bash
+switchboard create projeto-x --name paulo
+# imprime algo tipo:  switchboard join eyJyIjoi...  (o convite)
+```
+
+Os outros entram colando o convite:
+
+```bash
+switchboard join eyJyIjoi...   --name antonio
+```
+
+Reinicie o Claude Code na pasta e pronto. Depois é só trabalhar normal e falar com o Claude em linguagem natural ("manda isso pro fulano"). O resto é automático.
+
+## Salas e segurança
+Cada sala tem um nome único (com sufixo aleatório) e uma chave secreta. O **convite** carrega sala + chave + relay juntos. Quem tem o convite entra; quem não tem, nem lendo nem escrevendo (o relay devolve 403). Ou seja, ninguém cai na sala dos outros por adivinhar o nome.
+
+Aviso honesto de v1: a segurança está no convite, então trate ele como senha (não cole em lugar público). É bom o suficiente pra time pequeno, não é feito pra dado sensível.
 
 ## O relay (onde a sala vive)
 
