@@ -51,10 +51,10 @@ const server = createServer(async (req, res) => {
     return send(res, 200, { ok: true, rev: data.rev });
   }
 
-  // POST /r/:room/event -> nota rápida na timeline
+  // POST /r/:room/event -> nota ou mensagem direcionada (campo "to")
   if (req.method === "POST" && sub === "/event") {
     const b = await readBody(req);
-    data.events.push({ type: "note", by: b.by || "?", text: b.text || "", at: b.at || Date.now() });
+    data.events.push({ type: b.to ? "message" : "note", by: b.by || "?", to: b.to || null, text: b.text || "", at: b.at || Date.now() });
     data.events = data.events.slice(-200);
     save(room, data);
     return send(res, 200, { ok: true });

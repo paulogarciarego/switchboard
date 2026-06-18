@@ -38,3 +38,11 @@ export function note({ text, by }) {
     body: JSON.stringify({ text, by, at: Date.now() }),
   });
 }
+
+// Manda uma mensagem direcionada a um colega (ex: "manda isso pro helio")
+export function send({ to, text, by }) {
+  return req("/event", {
+    method: "POST",
+    body: JSON.stringify({ to, text, by, at: Date.now() }),
+  });
+}

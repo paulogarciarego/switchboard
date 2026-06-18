@@ -6,14 +6,31 @@
   "bin": {
     "switchboard": "bin/switchboard.mjs",
     "sb": "bin/switchboard.mjs",
-    "switchboard-mcp": "mcp/server.mjs"
+    "switchboard-mcp": "mcp/server.mjs",
+    "switchboard-autosync": "hooks/autosync.mjs"
   },
-  "files": ["bin", "src", "mcp", "claude", "README.md"],
-  "engines": { "node": ">=18" },
+  "files": [
+    "bin",
+    "src",
+    "mcp",
+    "hooks",
+    "claude",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "relay": "node src/relay-server.mjs",
     "mcp": "node mcp/server.mjs"
   },
-  "keywords": ["claude", "claude-code", "mcp", "collaboration", "context", "switchboard"],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "mcp",
+    "collaboration",
+    "context",
+    "switchboard"
+  ],
   "license": "MIT"
 }

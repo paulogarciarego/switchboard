@@ -34,7 +34,7 @@ export default {
     }
     if (req.method === "POST" && sub === "/event") {
       const b = await req.json().catch(() => ({}));
-      data.events.push({ type: "note", by: b.by || "?", text: b.text || "", at: b.at || Date.now() });
+      data.events.push({ type: b.to ? "message" : "note", by: b.by || "?", to: b.to || null, text: b.text || "", at: b.at || Date.now() });
       data.events = data.events.slice(-200);
       await env.ROOMS.put(key, JSON.stringify(data));
       return json(200, { ok: true });

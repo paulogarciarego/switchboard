@@ -6,10 +6,14 @@ Não é dois Claudes batendo papo. É um **contexto compartilhado** (tipo um git
 
 ## Como funciona
 
-- Vocês combinam um nome de sala (ex: `projeto-x`) e os dois dão `join`.
-- Quando você decide algo ou avança, o Claude dá **/sb-push**: ele resume o que importa (tarefa, decisões, estado, arquivos, próximos passos) e sobe pra sala.
-- Quando o colega quer se atualizar, o Claude dele dá **/sb-pull**: baixa o último contexto e alinha o plano.
-- A sala também tem uma timeline de notas rápidas ("mexendo no auth.ts, não encosta").
+É automático, em linguagem natural. Você não fica rodando comando.
+
+- Vocês combinam um nome de sala (ex: `projeto-x`) e os dois dão `join` uma vez.
+- **Mandar:** você fala pro seu Claude do jeito normal, tipo "manda essas instruções pro Hélio" ou "avisa o Antonio que o contrato mudou". O Claude dispara sozinho (ferramenta `sb_send`).
+- **Receber:** o hook de **auto-sync** roda antes de cada mensagem do colega. Quando o Hélio digitar qualquer coisa, o Claude dele já mostra "📨 antonio te mandou: ...". Sem comando.
+- Também dá pra compartilhar um documento de contexto curado (tarefa, decisões, arquivos) com `sb_push`, que o auto-sync entrega pros outros.
+
+Limitação honesta: se o colega estiver com o Claude parado sem digitar nada, a mensagem chega no instante em que ele mandar a próxima. Não dá pra injetar numa sessão ociosa.
 
 ## Instalação
 

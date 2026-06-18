@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "switchboard": { "command": "switchboard-mcp" }
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "switchboard-autosync" } ] }
+    ]
+  }
+}

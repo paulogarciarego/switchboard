@@ -24,8 +24,20 @@ const TOOLS = [
     },
   },
   {
+    name: "sb_send",
+    description: "Manda uma mensagem/instrução DIRECIONADA a um colega de equipe pela sala. Use quando o usuário disser algo como 'manda isso pro Hélio' ou 'avisa o Antonio que...'. O Claude do colega recebe automaticamente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Nome do colega (como ele entrou na sala), ex: 'helio'" },
+        text: { type: "string", description: "A instrução/mensagem pra ele" },
+      },
+      required: ["to", "text"],
+    },
+  },
+  {
     name: "sb_note",
-    description: "Manda uma nota rápida na timeline da sala, ex: 'mexi no auth.ts, não encoste agora'.",
+    description: "Manda uma nota rápida na timeline da sala (pra todos), ex: 'mexi no auth.ts, não encoste agora'.",
     inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
   },
   {
@@ -65,6 +77,11 @@ async function callTool(name, args) {
       if (!args?.body) return "Faltou o 'body' (o resumo do contexto).";
       const r = await api.push({ title: args.title || "Contexto", body: args.body, by: cfg.name });
       return `Contexto enviado pra sala "${cfg.room}" (rev ${r.rev}). Os colegas vão ver no próximo sb_pull.`;
+    }
+    case "sb_send": {
+      if (!args?.to || !args?.text) return "Faltou 'to' (pra quem) ou 'text' (a mensagem).";
+      await api.send({ to: args.to, text: args.text, by: cfg.name });
+      return `Mensagem enviada pro ${args.to}. O Claude dele recebe automaticamente na próxima mensagem que ele mandar.`;
     }
     case "sb_note": {
       if (!args?.text) return "Faltou o 'text'.";
