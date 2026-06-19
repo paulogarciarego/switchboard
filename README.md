@@ -10,14 +10,16 @@ Não é dois Claudes batendo papo. É um **contexto compartilhado** (tipo um git
 
 ## Como funciona
 
-É automático, em linguagem natural. Você não fica rodando comando.
+É tudo automático e invisível. Você não fica rodando comando, só trabalha normal.
 
-- Vocês combinam um nome de sala (ex: `projeto-x`) e os dois dão `join` uma vez.
-- **Mandar:** você fala pro seu Claude do jeito normal, tipo "manda essas instruções pro Hélio" ou "avisa o Antonio que o contrato mudou". O Claude dispara sozinho (ferramenta `sb_send`).
-- **Receber:** o hook de **auto-sync** roda antes de cada mensagem do colega. Quando o Hélio digitar qualquer coisa, o Claude dele já mostra "📨 antonio te mandou: ...". Sem comando.
-- Também dá pra compartilhar um documento de contexto curado (tarefa, decisões, arquivos) com `sb_push`, que o auto-sync entrega pros outros.
+- Vocês combinam uma sala e dão `join` uma vez (via convite).
+- **Mandar:** fala pro seu Claude do jeito normal ("manda essas instruções pro Hélio", "avisa o Antonio que o contrato mudou"). O Claude dispara sozinho.
+- **Receber:** quando o colega digitar qualquer coisa, o Claude dele já mostra "📨 antonio te mandou: ...". Sem comando.
+- **Auto-share:** quando você mexe em arquivos, o time recebe sozinho um "🔧 fulano mexeu em a.ts, b.ts". Ninguém precisa avisar nada.
+- **Guarda de colisão:** se você vai editar um arquivo que um colega está mexendo agora, o Claude te avisa antes ("o Antonio está nesse arquivo"). Evita os dois pisarem no mesmo lugar.
+- **Contexto compartilhado:** dá pra subir um resumo curado (tarefa, decisões, arquivos) que o time recebe automático. Se dois subirem junto, nada é sobrescrito (o Claude junta).
 
-Limitação honesta: se o colega estiver com o Claude parado sem digitar nada, a mensagem chega no instante em que ele mandar a próxima. Não dá pra injetar numa sessão ociosa.
+Limitação honesta: se o colega estiver com o Claude totalmente parado, a mensagem chega no instante em que ele mandar a próxima coisa. Não dá pra injetar numa sessão ociosa.
 
 ## Instalação
 
@@ -49,10 +51,13 @@ switchboard join eyJyIjoi...   --name antonio
 
 Reinicie o Claude Code na pasta e pronto. Depois é só trabalhar normal e falar com o Claude em linguagem natural ("manda isso pro fulano"). O resto é automático.
 
-## Salas e segurança
-Cada sala tem um nome único (com sufixo aleatório) e uma chave secreta. O **convite** carrega sala + chave + relay juntos. Quem tem o convite entra; quem não tem, nem lendo nem escrevendo (o relay devolve 403). Ou seja, ninguém cai na sala dos outros por adivinhar o nome.
+## Segurança (tudo automático, nada pra configurar)
+- **Criptografia ponta a ponta:** o conteúdo (contexto e mensagens) é cifrado no seu computador antes de subir. O relay (mesmo o público) só guarda blob cifrado e **não consegue ler nada**. A chave nasce do convite, então não tem passo nenhum.
+- **Acesso por chave de sala:** o convite carrega sala + chave. Quem não tem o convite não entra (o relay devolve 403). O nome da sala já vem com sufixo aleatório, então nem dá pra adivinhar.
+- **Identidade:** cada pessoa ganha um token próprio no `join` (automático, nunca digitado), então ninguém se passa por outro dentro da sala.
+- **Relay protegido:** limite de tamanho, salas paradas expiram, e nomes de sala são validados.
 
-Aviso honesto de v1: a segurança está no convite, então trate ele como senha (não cole em lugar público). É bom o suficiente pra time pequeno, não é feito pra dado sensível.
+Trate o convite como senha (não cole em lugar público). Mesmo assim, como tudo é cifrado, o relay nunca vê o que vocês trabalham.
 
 ## O relay (onde a sala vive)
 
@@ -91,6 +96,7 @@ switchboard status
 
 ## Roadmap
 - [x] MVP: salas, push/pull de contexto, notas, MCP, CLI, relay local + Worker
+- [x] Tudo invisível e seguro: criptografia E2E, identidade, auto-share, guarda de colisão, presença (`sb_who`), concorrência sem sobrescrever, hardening do relay
 - [ ] Auto-sync (hook que dá pull no começo de cada turno)
 - [ ] Babel mode: tradução automática por idioma de cada participante (o Claude de um fala inglês, o do outro português)
 - [ ] N participantes (sala com vários) e histórico/diff de contexto

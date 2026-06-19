@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 export const DIR = join(homedir(), ".switchboard");
 const FILE = join(DIR, "config.json");
 
-const DEFAULTS = { relay: "http://127.0.0.1:8787", room: null, name: null };
+const DEFAULTS = { relay: "http://127.0.0.1:8787", room: null, name: null, key: null, member: null };
 
 export function readConfig() {
   try {

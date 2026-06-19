@@ -7,7 +7,9 @@
     "switchboard": "bin/switchboard.mjs",
     "sb": "bin/switchboard.mjs",
     "switchboard-mcp": "mcp/server.mjs",
-    "switchboard-autosync": "hooks/autosync.mjs"
+    "switchboard-autosync": "hooks/autosync.mjs",
+    "switchboard-autoshare": "hooks/autoshare.mjs",
+    "switchboard-guard": "hooks/guard.mjs"
   },
   "files": [
     "bin",
@@ -22,7 +24,8 @@
   },
   "scripts": {
     "relay": "node src/relay-server.mjs",
-    "mcp": "node mcp/server.mjs"
+    "mcp": "node mcp/server.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "keywords": [
     "claude",

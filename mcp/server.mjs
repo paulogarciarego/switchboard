@@ -45,6 +45,11 @@ const TOOLS = [
     description: "Mostra a sala atual, quem você é e o resumo do último contexto + eventos recentes.",
     inputSchema: { type: "object", properties: {} },
   },
+  {
+    name: "sb_who",
+    description: "Mostra quem está ativo na sala agora e quais arquivos cada um está editando. Use quando o usuário perguntar quem está online ou se pode mexer num arquivo.",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 function send(msg) { process.stdout.write(JSON.stringify(msg) + "\n"); }
@@ -53,19 +58,22 @@ function err(id, code, message) { send({ jsonrpc: "2.0", id, error: { code, mess
 function textResult(id, text) { ok(id, { content: [{ type: "text", text }], isError: false }); }
 function fmtTime(t) { return new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
 
+let lastRev = null; // a rev que esta sessão viu por último (pra concorrência)
+const active = (s) => Object.entries(s.presence || {}).filter(([, t]) => Date.now() - t < 60 * 6e4).map(([n]) => n);
+
 async function callTool(name, args) {
   const cfg = readConfig();
-  if (!cfg.room) return "Você ainda não entrou numa sala. No terminal rode:  switchboard join <sala>";
+  if (!cfg.room) return "Você ainda não entrou numa sala. No terminal rode:  switchboard join <convite>";
   switch (name) {
     case "sb_status": {
-      const s = await api.pull();
-      let out = `sala: ${cfg.room} | você: ${cfg.name} | rev: ${s.rev}\n`;
+      const s = await api.pull(); lastRev = s.rev;
+      let out = `sala: ${cfg.room} | você: ${cfg.name} | rev: ${s.rev}\nativos agora: ${active(s).join(", ") || "(só você)"}\n`;
       if (s.context) out += `último contexto: "${s.context.title}" por ${s.context.by} (${fmtTime(s.context.at)})\n`;
       out += "eventos recentes:\n" + (s.events.slice(-8).map((e) => `  [${fmtTime(e.at)}] ${e.by}: ${e.text}`).join("\n") || "  (vazio)");
       return out;
     }
     case "sb_pull": {
-      const s = await api.pull();
+      const s = await api.pull(); lastRev = s.rev;
       if (!s.context && s.events.length === 0) return "A sala ainda está vazia. Ninguém enviou contexto.";
       let out = "";
       if (s.context) out += `=== CONTEXTO COMPARTILHADO (rev ${s.context.rev}, por ${s.context.by}, ${fmtTime(s.context.at)}) ===\n# ${s.context.title}\n\n${s.context.body}\n\n`;
@@ -75,18 +83,33 @@ async function callTool(name, args) {
     }
     case "sb_push": {
       if (!args?.body) return "Faltou o 'body' (o resumo do contexto).";
-      const r = await api.push({ title: args.title || "Contexto", body: args.body, by: cfg.name });
-      return `Contexto enviado pra sala "${cfg.room}" (rev ${r.rev}). Os colegas vão ver no próximo sb_pull.`;
+      try {
+        const r = await api.push({ title: args.title || "Contexto", body: args.body, baseRev: lastRev });
+        lastRev = r.rev;
+        return `Contexto enviado pra sala "${cfg.room}" (rev ${r.rev}). Os colegas recebem sozinhos.`;
+      } catch (e) {
+        if (e.status === 409) { // colega mexeu no meio: traz o atual pra você juntar
+          const s = await api.pull(); lastRev = s.rev;
+          return `CONFLITO: um colega atualizou o contexto enquanto você montava o seu. NÃO foi sobrescrito. Aqui está o contexto atual da sala (rev ${s.rev}):\n\n# ${s.context?.title || ""}\n${s.context?.body || ""}\n\nJunte o que você ia mandar com isso e chame sb_push de novo.`;
+        }
+        throw e;
+      }
     }
     case "sb_send": {
       if (!args?.to || !args?.text) return "Faltou 'to' (pra quem) ou 'text' (a mensagem).";
-      await api.send({ to: args.to, text: args.text, by: cfg.name });
+      await api.send({ to: args.to, text: args.text });
       return `Mensagem enviada pro ${args.to}. O Claude dele recebe automaticamente na próxima mensagem que ele mandar.`;
     }
     case "sb_note": {
       if (!args?.text) return "Faltou o 'text'.";
-      await api.note({ text: args.text, by: cfg.name });
+      await api.note({ text: args.text });
       return "Nota enviada pra timeline da sala.";
+    }
+    case "sb_who": {
+      const s = await api.pull(); lastRev = s.rev;
+      const list = active(s);
+      const claims = Object.entries(s.claims || {}).map(([p, c]) => `  ${c.by} em ${p}`).join("\n");
+      return `ativos agora na sala "${cfg.room}": ${list.join(", ") || "(só você)"}` + (claims ? `\narquivos em uso:\n${claims}` : "");
     }
     default:
       return `Ferramenta desconhecida: ${name}`;

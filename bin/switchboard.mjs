@@ -27,7 +27,7 @@ async function main() {
       const relay = flag("relay", readConfig().relay);
       const room = slug(positional[0]) + "-" + rand(3); // nome amigável + sufixo aleatório
       const key = rand(12); // chave secreta da sala
-      writeConfig({ room, key, relay, name });
+      writeConfig({ room, key, relay, name, member: readConfig().member || rand(16) });
       const invite = makeInvite({ r: room, k: key, u: relay });
       console.log(`sala criada: ${room}`);
       console.log(`você entrou como: ${name}\n`);
@@ -40,9 +40,10 @@ async function main() {
       const arg = positional[0];
       if (!arg) return fail("uso: switchboard join <convite>   (ou: join <sala> --key CHAVE)");
       const inv = parseInvite(arg);
+      const member = readConfig().member || rand(16);
       const cfg = inv
-        ? writeConfig({ room: inv.r, key: inv.k, relay: inv.u || readConfig().relay, name: flag("name", readConfig().name || process.env.USER || "anon") })
-        : writeConfig({ room: arg, key: flag("key", null), relay: flag("relay", readConfig().relay), name: flag("name", readConfig().name || process.env.USER || "anon") });
+        ? writeConfig({ room: inv.r, key: inv.k, relay: inv.u || readConfig().relay, name: flag("name", readConfig().name || process.env.USER || "anon"), member })
+        : writeConfig({ room: arg, key: flag("key", null), relay: flag("relay", readConfig().relay), name: flag("name", readConfig().name || process.env.USER || "anon"), member });
       console.log(`entrou na sala "${cfg.room}" como ${cfg.name}`);
       console.log(cfg.key ? "sala protegida por chave ✓" : "sala aberta (sem chave) ⚠");
       break;
@@ -74,15 +75,14 @@ async function main() {
       const fileArg = flag("file");
       let body = fileArg ? readFileSync(fileArg, "utf8") : await readStdin();
       if (!body?.trim()) return fail("nada pra enviar. uso: echo '...' | switchboard push --title 'X'   ou  --file contexto.md");
-      const r = await api.push({ title, body, by: cfg.name });
+      const r = await api.push({ title, body });
       console.log(`contexto enviado (rev ${r.rev})`);
       break;
     }
     case "note": {
-      const cfg = readConfig();
       const text = positional.join(" ");
       if (!text) return fail("uso: switchboard note \"mexi no arquivo X\"");
-      await api.note({ text, by: cfg.name });
+      await api.note({ text });
       console.log("nota enviada");
       break;
     }
@@ -99,21 +99,28 @@ async function main() {
       mcp.mcpServers.switchboard = { command: "switchboard-mcp" };
       writeFileSync(mcpPath, JSON.stringify(mcp, null, 2));
 
-      // 2) hook de auto-sync em .claude/settings.json
+      // 2) hooks invisíveis em .claude/settings.json (idempotente)
       mkdirSync(".claude", { recursive: true });
       const setPath = ".claude/settings.json";
       const set = readJson(setPath);
       set.hooks = set.hooks || {};
-      set.hooks.UserPromptSubmit = set.hooks.UserPromptSubmit || [];
-      const already = JSON.stringify(set.hooks.UserPromptSubmit).includes("switchboard-autosync");
-      if (!already) set.hooks.UserPromptSubmit.push({ hooks: [{ type: "command", command: "switchboard-autosync" }] });
+      const addHook = (event, command, matcher) => {
+        set.hooks[event] = set.hooks[event] || [];
+        if (JSON.stringify(set.hooks[event]).includes(command)) return;
+        const entry = { hooks: [{ type: "command", command }] };
+        if (matcher) entry.matcher = matcher;
+        set.hooks[event].push(entry);
+      };
+      addHook("UserPromptSubmit", "switchboard-autosync");                 // recebe sozinho
+      addHook("Stop", "switchboard-autoshare");                            // compartilha sozinho
+      addHook("PreToolUse", "switchboard-guard", "Edit|Write|MultiEdit");  // guarda de colisão
       writeFileSync(setPath, JSON.stringify(set, null, 2));
 
       console.log("switchboard ligado neste projeto:");
-      console.log("  .mcp.json            -> ferramentas (sb_send, sb_push, sb_pull...)");
-      console.log("  .claude/settings.json-> hook de auto-sync (recebe sozinho)");
-      console.log(already ? "  (hook já estava ligado)" : "");
-      console.log("\nagora rode:  switchboard join <sala> --name SEU_NOME");
+      console.log("  .mcp.json             -> ferramentas (sb_send, sb_push, sb_pull, sb_who...)");
+      console.log("  .claude/settings.json -> hooks invisíveis:");
+      console.log("     auto-sync (recebe), auto-share (compartilha), guarda (anti-colisão)");
+      console.log("\nagora rode:  switchboard join <convite>");
       console.log("e reinicie o Claude Code nessa pasta.");
       break;
     }

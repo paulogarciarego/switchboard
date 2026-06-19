@@ -1,4 +1,4 @@
-// Guarda o "já vi até aqui" por sala, pra o auto-sync só mostrar o que é novo.
+// Guarda o "já vi até aqui" por sala, pro auto-sync só mostrar o que é novo.
 import { join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { DIR } from "./config.mjs";
@@ -9,11 +9,11 @@ function all() {
   try { return JSON.parse(readFileSync(FILE, "utf8")); } catch { return {}; }
 }
 export function getSeen(room) {
-  return all()[room] || { rev: 0, eventAt: 0 };
+  return { rev: 0, lastSeq: 0, warned: false, ...(all()[room] || {}) };
 }
-export function setSeen(room, seen) {
+export function setSeen(room, patch) {
   mkdirSync(DIR, { recursive: true });
   const data = all();
-  data[room] = seen;
+  data[room] = { ...getSeen(room), ...patch };
   writeFileSync(FILE, JSON.stringify(data, null, 2));
 }
