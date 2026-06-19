@@ -55,8 +55,9 @@ async function main() {
       console.log(`relay: ${cfg.relay}`);
       if (cfg.room) {
         const s = await api.pull();
-        console.log(`rev:   ${s.rev}`);
-        if (s.context) console.log(`ultimo contexto: "${s.context.title}" por ${s.context.by} (${fmtTime(s.context.at)})`);
+        const c = (s.contexts || {})[api.branch()];
+        console.log(`branch: ${api.branch()}`);
+        if (c) console.log(`contexto: "${c.title}" por ${c.by} (rev ${c.rev})`);
         console.log("eventos recentes:");
         for (const e of s.events.slice(-6)) console.log(`  [${fmtTime(e.at)}] ${e.by}: ${e.text}`);
       }
@@ -64,9 +65,10 @@ async function main() {
     }
     case "pull": {
       const s = await api.pull();
-      if (!s.context) { console.log("(sala sem contexto ainda)"); break; }
-      console.log(`# ${s.context.title}\n(por ${s.context.by}, ${fmtTime(s.context.at)}, rev ${s.context.rev})\n`);
-      console.log(s.context.body);
+      const c = (s.contexts || {})[api.branch()];
+      if (!c) { console.log(`(branch "${api.branch()}" sem contexto ainda)`); break; }
+      console.log(`# ${c.title}\n(branch ${api.branch()}, por ${c.by}, ${fmtTime(c.at)}, rev ${c.rev})\n`);
+      console.log(c.body);
       break;
     }
     case "push": {

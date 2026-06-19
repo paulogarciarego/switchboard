@@ -29,11 +29,11 @@ before(async () => {
 });
 after(() => relay?.kill());
 
-test("E2E: relay guarda cifrado, cliente decifra", async () => {
+test("E2E: relay guarda cifrado, cliente decifra (por branch)", async () => {
   const api = await import("../src/api.mjs");
-  await api.push({ title: "Secreto", body: "conteudo super secreto 42" });
+  await api.push({ title: "Secreto", body: "conteudo super secreto 42", branch: "main" });
   const s = await api.pull();
-  assert.equal(s.context.body, "conteudo super secreto 42");
+  assert.equal(s.contexts.main.body, "conteudo super secreto 42");
   const f = readdirSync(join(HOME, ".switchboard", "rooms"))[0];
   const raw = readFileSync(join(HOME, ".switchboard", "rooms", f), "utf8");
   assert.ok(!raw.includes("super secreto"), "o relay NÃO pode ter o texto claro");
@@ -49,12 +49,25 @@ test("403: impersonação (nome de outro com token diferente)", async () => {
   assert.equal(r.status, 403);
 });
 
-test("409: concorrência não sobrescreve", async () => {
+test("409: concorrência não sobrescreve (por branch)", async () => {
   const api = await import("../src/api.mjs");
-  const s = await api.pull();          // rev atual
-  await api.push({ title: "a", body: "b" }); // bumpa a rev
-  const r = await fetch(`${RELAY}/r/${ROOM}/context`, { method: "PUT", headers: H, body: JSON.stringify({ title: "x", body: "y", baseRev: s.rev }) });
-  assert.equal(r.status, 409);          // baseRev velho -> conflito
+  const s = await api.pull();
+  const oldRev = s.contexts.main?.rev || 0;
+  await api.push({ title: "a", body: "b", branch: "main" }); // bumpa a rev do main
+  const r = await fetch(`${RELAY}/r/${ROOM}/context?branch=main`, { method: "PUT", headers: H, body: JSON.stringify({ title: "x", body: "y", baseRev: oldRev }) });
+  assert.equal(r.status, 409);
+});
+
+test("PR de contexto: abre e mergeia no branch destino", async () => {
+  const api = await import("../src/api.mjs");
+  const r = await api.propose({ fromBranch: "feature", toBranch: "main", title: "minha proposta", body: "usar Stripe" });
+  assert.ok(r.id);
+  let s = await api.pull();
+  assert.ok(s.proposals.find((p) => p.id === r.id && p.status === "open"));
+  await api.resolveProposal({ id: r.id, action: "merge", title: "merge final", body: "decidido: Stripe (juntado)" });
+  s = await api.pull();
+  assert.equal(s.contexts.main.body, "decidido: Stripe (juntado)");
+  assert.equal(s.proposals.find((p) => p.id === r.id).status, "merged");
 });
 
 test("mensagem direcionada tem seq e chega", async () => {

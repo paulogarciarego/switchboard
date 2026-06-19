@@ -2,6 +2,7 @@
 // Cifra o conteúdo na saída e decifra na entrada (o relay nunca vê texto claro).
 import { readConfig } from "./config.mjs";
 import { enc, dec } from "./crypto.mjs";
+import { currentBranch } from "./git.mjs";
 
 function base() {
   const { relay, room } = readConfig();
@@ -33,20 +34,34 @@ async function req(path, opts = {}) {
 // decifra os campos de conteúdo de um estado de sala
 function decryptState(s) {
   if (!s) return s;
-  if (s.context) { s.context.title = dec(s.context.title); s.context.body = dec(s.context.body); }
+  for (const c of Object.values(s.contexts || {})) { c.title = dec(c.title); c.body = dec(c.body); }
+  for (const p of s.proposals || []) { p.title = dec(p.title); p.body = dec(p.body); }
   for (const e of s.events || []) if (e.text) e.text = dec(e.text);
   for (const m of s.messages || []) if (m.text) m.text = dec(m.text);
   return s;
 }
 
-// estado da sala (contexto + timeline + mensagens), já decifrado
+// estado da sala (contextos por branch + PRs + timeline + mensagens), já decifrado
 export async function pull(opts = {}) {
   return decryptState(await req("", { timeout: opts.timeout }));
 }
 
-// sobe/atualiza o contexto compartilhado (cifrado). baseRev = a rev que vc viu.
-export function push({ title, body, baseRev }) {
-  return req("/context", { method: "PUT", body: JSON.stringify({ title: enc(title), body: enc(body), baseRev }) });
+export function branch() { return currentBranch(); }
+
+// sobe/atualiza o contexto do SEU branch (cifrado). baseRev = a rev que vc viu.
+export function push({ title, body, baseRev, branch: br }) {
+  const b = br || currentBranch();
+  return req(`/context?branch=${encodeURIComponent(b)}`, { method: "PUT", body: JSON.stringify({ title: enc(title), body: enc(body), baseRev }) });
+}
+
+// abre um PR de contexto (do seu branch pra um destino, padrão main)
+export function propose({ fromBranch, toBranch, title, body }) {
+  return req("/proposal", { method: "POST", body: JSON.stringify({ fromBranch: fromBranch || currentBranch(), toBranch: toBranch || "main", title: enc(title), body: enc(body), titlePlain: (title || "").slice(0, 60) }) });
+}
+
+// aceita (merge) ou fecha um PR. No merge, manda o contexto já juntado pelo revisor.
+export function resolveProposal({ id, action, title, body }) {
+  return req(`/proposal/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ action, title: title != null ? enc(title) : undefined, body: body != null ? enc(body) : undefined }) });
 }
 
 // nota rápida na timeline (pra todos), cifrada

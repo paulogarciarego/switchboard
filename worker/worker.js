@@ -14,12 +14,12 @@ const cors = {
   "access-control-allow-headers": "content-type,x-sb-key,x-sb-name,x-sb-member",
 };
 const json = (status, obj) => new Response(obj == null ? "" : JSON.stringify(obj), { status, headers: { "content-type": "application/json", ...cors } });
-const empty = () => ({ rev: 0, seq: 0, context: null, events: [], messages: [], claims: {}, presence: {}, keyHash: null, members: {} });
+const empty = () => ({ seq: 0, contexts: {}, proposals: [], events: [], messages: [], claims: {}, presence: {}, keyHash: null, members: {} });
 async function sha(s) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s)));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-const sanitize = (d) => ({ rev: d.rev, seq: d.seq, context: d.context, events: d.events, messages: d.messages, claims: d.claims, presence: d.presence });
+const sanitize = (d) => ({ seq: d.seq, contexts: d.contexts, proposals: d.proposals, events: d.events, messages: d.messages, claims: d.claims, presence: d.presence });
 function prune(d) {
   for (const [p, c] of Object.entries(d.claims)) if (Date.now() - c.at > CLAIM_TTL) delete d.claims[p];
   for (const [n, t] of Object.entries(d.presence)) if (Date.now() - t > PRESENCE_TTL) delete d.presence[n];
@@ -30,10 +30,11 @@ export default {
     if (req.method === "OPTIONS") return json(204, null);
     const url = new URL(req.url);
     if (url.pathname === "/" || url.pathname === "/health") return json(200, { ok: true, service: "switchboard-relay" });
-    const m = url.pathname.match(/^\/r\/([^/]+)(\/context|\/event|\/claim)?\/?$/);
+    const m = url.pathname.match(/^\/r\/([^/]+)(\/context|\/event|\/claim|\/proposal)?(?:\/([^/]+))?\/?$/);
     if (!m) return json(404, { error: "not found" });
 
-    const room = decodeURIComponent(m[1]), sub = m[2];
+    const room = decodeURIComponent(m[1]), sub = m[2], propId = m[3];
+    const branch = url.searchParams.get("branch") || "main";
     if (!ROOM_RE.test(room)) return json(400, { error: "nome de sala inválido" });
     if (Number(req.headers.get("content-length") || 0) > MAX_BODY) return json(413, { error: "conteúdo grande demais" });
 
@@ -66,13 +67,15 @@ export default {
     if (JSON.stringify(b).length > MAX_BODY) return json(413, { error: "conteúdo grande demais" });
 
     if (req.method === "PUT" && sub === "/context") {
-      if (b.baseRev != null && Number(b.baseRev) !== data.rev) return json(409, { error: "contexto mudou", current: sanitize(data) });
-      data.rev += 1; data.seq += 1;
-      data.context = { title: b.title || "", body: b.body || "", by, at: Date.now(), rev: data.rev };
-      data.events.push({ type: "context", by, text: "atualizou o contexto", at: Date.now(), seq: data.seq });
+      const cur = data.contexts[branch];
+      if (b.baseRev != null && Number(b.baseRev) !== (cur?.rev || 0)) return json(409, { error: "contexto mudou", current: sanitize(data) });
+      const rev = (cur?.rev || 0) + 1;
+      data.seq += 1;
+      data.contexts[branch] = { title: b.title || "", body: b.body || "", by, at: Date.now(), rev };
+      data.events.push({ type: "context", by, text: `atualizou o contexto (${branch})`, at: Date.now(), seq: data.seq });
       data.events = data.events.slice(-100);
       await put();
-      return json(200, { ok: true, rev: data.rev });
+      return json(200, { ok: true, rev });
     }
     if (req.method === "POST" && sub === "/event") {
       data.seq += 1;
@@ -88,6 +91,34 @@ export default {
         await put();
       }
       return json(200, { ok: true });
+    }
+    if (req.method === "POST" && sub === "/proposal" && !propId) {
+      data.seq += 1;
+      const id = "pr" + (data.proposals.length + 1);
+      const p = { id, by, fromBranch: b.fromBranch || branch, toBranch: b.toBranch || "main", title: b.title || "", body: b.body || "", at: Date.now(), status: "open", seq: data.seq };
+      data.proposals.push(p);
+      data.events.push({ type: "note", by, text: `abriu PR de contexto ${id}: "${b.titlePlain || id}" (${p.fromBranch} -> ${p.toBranch})`, at: Date.now(), seq: data.seq });
+      data.events = data.events.slice(-100);
+      await put();
+      return json(200, { ok: true, id });
+    }
+    if (req.method === "POST" && sub === "/proposal" && propId) {
+      const p = data.proposals.find((x) => x.id === propId);
+      if (!p) return json(404, { error: "PR não encontrado" });
+      data.seq += 1;
+      if (b.action === "merge") {
+        const tb = p.toBranch;
+        const rev = (data.contexts[tb]?.rev || 0) + 1;
+        data.contexts[tb] = { title: b.title ?? p.title, body: b.body ?? p.body, by, at: Date.now(), rev };
+        p.status = "merged";
+        data.events.push({ type: "note", by, text: `mergeou o PR ${p.id} em ${tb}`, at: Date.now(), seq: data.seq });
+      } else if (b.action === "close") {
+        p.status = "closed";
+        data.events.push({ type: "note", by, text: `fechou o PR ${p.id}`, at: Date.now(), seq: data.seq });
+      }
+      data.events = data.events.slice(-100);
+      await put();
+      return json(200, { ok: true, status: p.status });
     }
     return json(405, { error: "method not allowed" });
   },

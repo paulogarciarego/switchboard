@@ -4,6 +4,7 @@
 // contexto novo do time + mensagens direcionadas a você. Nada novo = nada impresso.
 import { readConfig } from "../src/config.mjs";
 import { getSeen, setSeen } from "../src/state.mjs";
+import { currentBranch } from "../src/git.mjs";
 import * as api from "../src/api.mjs";
 
 function fmtTime(t) { try { return new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } }
@@ -26,11 +27,13 @@ async function main() {
   const seen = getSeen(cfg.room);
   if (seen.warned) setSeen(cfg.room, { warned: false });
 
+  const branch = currentBranch();
+  const c = (s.contexts || {})[branch];
   const out = [];
-  if (s.context && (s.context.rev || 0) > seen.rev) {
-    out.push(`=== CONTEXTO NOVO NA SALA (por ${s.context.by}, ${fmtTime(s.context.at)}) ===`);
-    out.push(`# ${s.context.title}`);
-    out.push(s.context.body);
+  if (c && (c.rev || 0) > (seen.ctxRev[branch] || 0)) {
+    out.push(`=== CONTEXTO NOVO NO BRANCH "${branch}" (por ${c.by}, ${fmtTime(c.at)}) ===`);
+    out.push(`# ${c.title}`);
+    out.push(c.body);
   }
   const me = (cfg.name || "").toLowerCase();
   for (const m of (s.messages || []).filter((x) => (x.seq || 0) > seen.lastSeq && (x.to || "").toLowerCase() === me)) {
@@ -41,7 +44,7 @@ async function main() {
     out.push(`🔧 ${e.by} ${e.text} (${fmtTime(e.at)})`);
   }
 
-  setSeen(cfg.room, { rev: s.context?.rev || seen.rev, lastSeq: Math.max(seen.lastSeq, s.seq || 0) });
+  setSeen(cfg.room, { ctxRev: { ...seen.ctxRev, [branch]: c?.rev || seen.ctxRev[branch] || 0 }, lastSeq: Math.max(seen.lastSeq, s.seq || 0) });
 
   if (out.length) {
     out.unshift(`[switchboard · sala "${cfg.room}"]`);

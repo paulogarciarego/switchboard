@@ -9,7 +9,7 @@ function all() {
   try { return JSON.parse(readFileSync(FILE, "utf8")); } catch { return {}; }
 }
 export function getSeen(room) {
-  return { rev: 0, lastSeq: 0, warned: false, ...(all()[room] || {}) };
+  return { lastSeq: 0, warned: false, ctxRev: {}, ...(all()[room] || {}) };
 }
 export function setSeen(room, patch) {
   mkdirSync(DIR, { recursive: true });

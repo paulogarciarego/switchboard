@@ -88,11 +88,20 @@ switchboard pull
 switchboard status
 ```
 
+## Contexto como git (branches, merge e PR)
+O contexto anda junto do seu branch do git (detectado sozinho). Então cada branch tem seu próprio contexto, e dá pra:
+
+- **Importar** o contexto de outro branch/colega: você fala "importa o contexto do Antonio" e o Claude pega os dois contextos, junta, e principalmente **aponta as contradições** (ex: "ele decidiu Stripe, você decidiu Mercado Pago, resolve"). Isso o git não faz, ele só junta texto.
+- **Pull request de contexto:** "abre um PR do meu contexto pra main". O Claude do revisor lê a proposta + o contexto atual do destino, aponta divergências, junta e aceita (merge). Mesmo fluxo do GitHub, mas pro entendimento do trabalho.
+- **Nada é sobrescrito:** se dois mexem no contexto do mesmo branch, o segundo junta em vez de clobberar.
+
 ## Ferramentas MCP que o Claude enxerga
-- `sb_pull` - puxa o contexto compartilhado + eventos recentes
-- `sb_push` - sobe um resumo curado do contexto
-- `sb_note` - manda uma nota rápida na timeline
-- `sb_status` - estado da sala
+- `sb_pull` / `sb_push` - lê/atualiza o contexto do seu branch
+- `sb_import` - importa e junta o contexto de outro branch/colega (aponta contradições)
+- `sb_propose` / `sb_review` / `sb_accept` - abre, revisa e mergeia um PR de contexto
+- `sb_send` - mensagem direcionada a um colega
+- `sb_who` - quem está ativo e em qual arquivo
+- `sb_note` / `sb_status` - timeline e estado da sala
 
 ## Roadmap
 - [x] MVP: salas, push/pull de contexto, notas, MCP, CLI, relay local + Worker

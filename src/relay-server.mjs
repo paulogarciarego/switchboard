@@ -20,7 +20,7 @@ const RL_WINDOW = 1e4, RL_MAX = 120; // 120 req / 10s por sala
 
 const sha = (s) => createHash("sha256").update(String(s)).digest("hex");
 const file = (room) => join(ROOMS_DIR, encodeURIComponent(room) + ".json");
-const empty = () => ({ rev: 0, seq: 0, context: null, events: [], messages: [], claims: {}, presence: {}, keyHash: null, members: {}, updatedAt: Date.now() });
+const empty = () => ({ seq: 0, contexts: {}, proposals: [], events: [], messages: [], claims: {}, presence: {}, keyHash: null, members: {}, updatedAt: Date.now() });
 
 function load(room) {
   try {
@@ -35,7 +35,7 @@ function save(room, data) {
   for (const [n, t] of Object.entries(data.presence)) if (Date.now() - t > PRESENCE_TTL) delete data.presence[n];
   writeFileSync(file(room), JSON.stringify(data));
 }
-const sanitize = (d) => ({ rev: d.rev, seq: d.seq, context: d.context, events: d.events, messages: d.messages, claims: d.claims, presence: d.presence });
+const sanitize = (d) => ({ seq: d.seq, contexts: d.contexts, proposals: d.proposals, events: d.events, messages: d.messages, claims: d.claims, presence: d.presence });
 
 const rl = new Map();
 function rateLimited(room) {
@@ -59,8 +59,9 @@ function readBody(req) {
 
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, null);
-  if (req.url === "/" || req.url === "/health") return send(res, 200, { ok: true, service: "switchboard-relay" });
-  const m = req.url.match(/^\/r\/([^/]+)(\/context|\/event|\/claim)?\/?$/);
+  const u = new URL(req.url, "http://x");
+  if (u.pathname === "/" || u.pathname === "/health") return send(res, 200, { ok: true, service: "switchboard-relay" });
+  const m = u.pathname.match(/^\/r\/([^/]+)(\/context|\/event|\/claim|\/proposal)?(?:\/([^/]+))?\/?$/);
   if (!m) return send(res, 404, { error: "not found" });
 
   const room = decodeURIComponent(m[1]);
@@ -68,6 +69,8 @@ const server = createServer(async (req, res) => {
   if (rateLimited(room)) return send(res, 429, { error: "muitas requisições, espere um pouco" });
 
   const sub = m[2];
+  const propId = m[3];
+  const branch = u.searchParams.get("branch") || "main";
   const data = load(room);
 
   // chave de acesso
@@ -96,17 +99,19 @@ const server = createServer(async (req, res) => {
   const b = await readBody(req);
   if (b.__over) return send(res, 413, { error: "conteúdo grande demais" });
 
-  // PUT /context -> contexto com concorrência otimista
+  // PUT /context?branch=B -> contexto do branch, com concorrência otimista por branch
   if (req.method === "PUT" && sub === "/context") {
-    if (b.baseRev != null && Number(b.baseRev) !== data.rev) {
+    const cur = data.contexts[branch];
+    if (b.baseRev != null && Number(b.baseRev) !== (cur?.rev || 0)) {
       return send(res, 409, { error: "contexto mudou", current: sanitize(data) });
     }
-    data.rev += 1; data.seq += 1;
-    data.context = { title: b.title || "", body: b.body || "", by, at: Date.now(), rev: data.rev };
-    data.events.push({ type: "context", by, text: "atualizou o contexto", at: Date.now(), seq: data.seq });
+    const rev = (cur?.rev || 0) + 1;
+    data.seq += 1;
+    data.contexts[branch] = { title: b.title || "", body: b.body || "", by, at: Date.now(), rev };
+    data.events.push({ type: "context", by, text: `atualizou o contexto (${branch})`, at: Date.now(), seq: data.seq });
     data.events = data.events.slice(-100);
     save(room, data);
-    return send(res, 200, { ok: true, rev: data.rev });
+    return send(res, 200, { ok: true, rev });
   }
 
   // POST /event -> nota (timeline) ou mensagem direcionada (to)
@@ -131,6 +136,39 @@ const server = createServer(async (req, res) => {
       save(room, data);
     }
     return send(res, 200, { ok: true });
+  }
+
+  // POST /proposal -> abre um PR de contexto (fromBranch -> toBranch)
+  if (req.method === "POST" && sub === "/proposal" && !propId) {
+    data.seq += 1;
+    const id = "pr" + (data.proposals.length + 1);
+    const p = { id, by, fromBranch: b.fromBranch || branch, toBranch: b.toBranch || "main", title: b.title || "", body: b.body || "", at: Date.now(), status: "open", seq: data.seq };
+    data.proposals.push(p);
+    data.events.push({ type: "note", by, text: `abriu PR de contexto ${id}: "${b.titlePlain || id}" (${p.fromBranch} -> ${p.toBranch})`, at: Date.now(), seq: data.seq });
+    data.events = data.events.slice(-100);
+    save(room, data);
+    return send(res, 200, { ok: true, id });
+  }
+
+  // POST /proposal/:id -> aceitar (merge) ou fechar um PR de contexto
+  if (req.method === "POST" && sub === "/proposal" && propId) {
+    const p = data.proposals.find((x) => x.id === propId);
+    if (!p) return send(res, 404, { error: "PR não encontrado" });
+    data.seq += 1;
+    if (b.action === "merge") {
+      const tb = p.toBranch;
+      const rev = (data.contexts[tb]?.rev || 0) + 1;
+      // o body do merge vem do revisor (já juntado pelo Claude dele)
+      data.contexts[tb] = { title: b.title ?? p.title, body: b.body ?? p.body, by, at: Date.now(), rev };
+      p.status = "merged";
+      data.events.push({ type: "note", by, text: `mergeou o PR ${p.id} em ${tb}`, at: Date.now(), seq: data.seq });
+    } else if (b.action === "close") {
+      p.status = "closed";
+      data.events.push({ type: "note", by, text: `fechou o PR ${p.id}`, at: Date.now(), seq: data.seq });
+    }
+    data.events = data.events.slice(-100);
+    save(room, data);
+    return send(res, 200, { ok: true, status: p.status });
   }
 
   return send(res, 405, { error: "method not allowed" });
