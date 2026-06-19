@@ -5,6 +5,12 @@
   "hooks": {
     "UserPromptSubmit": [
       { "hooks": [ { "type": "command", "command": "switchboard-autosync" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "switchboard-autoshare" } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [ { "type": "command", "command": "switchboard-guard" } ] }
     ]
   }
 }
